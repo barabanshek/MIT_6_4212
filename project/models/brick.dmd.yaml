@@ -1,16 +1,28 @@
 
 directives:
-- add_frame:
-    name: brick0_origin
-    X_PF:
-      base_frame: world
-      rotation: !Rpy { deg: [0.0, 0.0, 0.0 ]}
-      translation: [0.5, 0.5, 0]
-
 - add_model:
     name: brick0
     file: package://manipulation/real_brick.sdf
+    
+- add_model:
+    name: brick1
+    file: package://manipulation/real_brick.sdf
+    
+#- add_model:
+#    name: brick2
+#    file: package://manipulation/real_brick.sdf
+
+- add_frame:
+    name: ground_origin
+    X_PF:
+      base_frame: world
+      rotation: !Rpy { deg: [0.0, 0.0, 0.0 ]}
+      translation: [0.0, 0.0, 0.0]
+
+- add_model:
+    name: ground
+    file: package://manipulation/ground_model.sdf
 
 - add_weld:
-    parent: brick0_origin
-    child: brick0::base_link
+    parent: ground_origin
+    child: ground::ground_base
