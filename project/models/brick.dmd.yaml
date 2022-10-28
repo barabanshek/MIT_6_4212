@@ -4,9 +4,9 @@ directives:
     name: brick0
     file: package://manipulation/real_brick.sdf
     
-- add_model:
-    name: brick1
-    file: package://manipulation/real_brick.sdf
+#- add_model:
+#    name: brick1
+#    file: package://manipulation/real_brick.sdf
     
 #- add_model:
 #    name: brick2
