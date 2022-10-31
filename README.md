@@ -9,7 +9,7 @@ This repo contains some stuff I used to paly with while taking 6.4212 at MIT. Th
 0. `Python3` with `venv` and `pip`
 1. `Jupyter Notebook`, nice instructions are [here](https://jupyter.org/install)
 2. `Drake`, nice instructions are [here](https://drake.mit.edu/pip.html#stable-releases)
-3. some extra packages: ``, ``, ``, ``, ``, ``, ``, ``, ``, ``.
+3. some extra packages: `mpld3`, `pyvirtualdisplay`, `Xvfb` .
 
 ### Install the repo and run it
 
