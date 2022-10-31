@@ -20,7 +20,6 @@ This repo contains some stuff I used to paly with while taking 6.4212 at MIT. Th
 3. For remote runs, we need to forward some jupyter-notebook and Drake SSH ports, I have a script for this: `run_drake_ssh.sh`. Note that no -X11 required for this to work -- Jupyter works just fine from the local browser when the right ports are forwareded. You might want to change `iptables` sometimes to allow the ports.
 
 ### Run the project
-
-To run the project, simply ope the notebook, load the file `project/Main.ipynb` and enjoy it! If any of the cells throughs a package error, simply install it in your python venv.
+To run the project, simply open the notebook, load the file `project/Main.ipynb` and enjoy it! If any of the cells throw a package error, simply install the package in your python venv.
 
 The README.md inside the `project` folder contains more info and other things on the project itself.
