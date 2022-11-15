@@ -105,26 +105,67 @@ class TrajectoryBuilder:
                                          0.1)
 
     def gen_place_brick_traj(self, X_WBrickTarget, brick_n=0):
-        self.trajectory.append_point(0.0001,
-                                     X_WBrickTarget @ self.X_BrickTargetPreG,
+        # Two points
+        X_B1 = X_WBrickTarget @ self.X_BrickTargetPreG
+        X_B2 = X_WBrickTarget @ self.X_BrickTargetG
+        # Open grip
+        self.trajectory.append_point(0.00001,
+                                     X_B1,
                                      self.finger_closed,
-                                     'pre-put #' + str(brick_n),
+                                     'grab brick #' + str(brick_n) + ' finger open',
                                      0.0)
-        self.trajectory.append_point(4,
-                                     X_WBrickTarget @ self.X_BrickTargetG,
-                                     self.finger_closed,
-                                     'put #' + str(brick_n),
-                                     0.0)
+        # Approach
+        traj1 = PiecewisePolynomial.FirstOrderHold(
+                      [0.0, 4.0],
+                          np.vstack([[X_B1.translation()],
+                                     [X_B2.translation()]]).T)
+        for i in np.arange(0.0, 4.0, 0.5):
+            self.trajectory.append_point(0.5,
+                                         RigidTransform(X_B2.rotation(), traj1.value(i)),
+                                         self.finger_closed,
+                                         'grab brick #' + str(brick_n) + ' approach (' + str(i) + ')',
+                                         0.0)
+        # Grab
         self.trajectory.append_point(2,
-                                     X_WBrickTarget @ self.X_BrickTargetG,
+                                     X_B2,
                                      self.finger_opened,
-                                     'put and open #' + str(brick_n),
+                                     'grab brick #' + str(brick_n) + ' finger close',
                                      0.0)
-        self.trajectory.append_point(4,
-                                     X_WBrickTarget @ self.X_BrickTargetPreG,
-                                     self.finger_opened,
-                                     'pre-put #' + str(brick_n),
-                                     0.0)
+        # Withdraw
+        traj2 = PiecewisePolynomial.FirstOrderHold(
+                      [0.0, 4.0],
+                          np.vstack([[X_B2.translation()],
+                                     [X_B1.translation()]]).T)
+        for i in np.arange(0.0, 4.0, 0.5):
+            self.trajectory.append_point(0.5,
+                                         RigidTransform(X_B1.rotation(), traj2.value(i)),
+                                         self.finger_opened,
+                                         'grab brick #' + str(brick_n) + ' withdraw (' + str(i) + ')',
+                                         0.0)
+
+
+
+
+        # self.trajectory.append_point(0.0001,
+        #                              X_WBrickTarget @ self.X_BrickTargetPreG,
+        #                              self.finger_closed,
+        #                              'pre-put #' + str(brick_n),
+        #                              0.0)
+        # self.trajectory.append_point(4,
+        #                              X_WBrickTarget @ self.X_BrickTargetG,
+        #                              self.finger_closed,
+        #                              'put #' + str(brick_n),
+        #                              0.0)
+        # self.trajectory.append_point(2,
+        #                              X_WBrickTarget @ self.X_BrickTargetG,
+        #                              self.finger_opened,
+        #                              'put and open #' + str(brick_n),
+        #                              0.0)
+        # self.trajectory.append_point(4,
+        #                              X_WBrickTarget @ self.X_BrickTargetPreG,
+        #                              self.finger_opened,
+        #                              'pre-put #' + str(brick_n),
+        #                              0.0)
 
     def gen_return_to_source_traj(self, X_WBrickTarget, brick_n=0):
         traj = PiecewisePolynomial.FirstOrderHold(

@@ -48,15 +48,14 @@ gBrickString = """
     file: package://manipulation/real_brick.sdf
 """
 
-# Brick warehouse config
-gBWhCell = np.array([0.12, 0.18, 0.12])
-
 
 #
 # iiwa robot class
 #
 class IIWA_Ilyich():
-    def __init__(self, meshcat, num_of_bricks, traj_in=None):
+    def __init__(self, meshcat, num_of_bricks, brick_geom, traj_in=None):
+        self.brick_geom = brick_geom
+
         global gModelDerectives
         global gBrickString
 
@@ -187,7 +186,8 @@ class IIWA_Ilyich():
         self.visualize_frame("brick_source", X_WBrickSource)
 
     def put_bricks_in_warehouse(self, context, wh_location, wh_size, brick_cnt):
-        global gBWhCell
+        # Warehouse cell geometry -- a little bigger than bricks
+        wh_cell_geom = self.brick_geom + np.array([0.02, 0.02, 0.02])
 
         # Put all bricks in the warehouse and lock them there
         # Grid cell spec: each warehouse cell is slightly bigger than the bricks
@@ -195,7 +195,7 @@ class IIWA_Ilyich():
         for z in range (0, wh_size[2]):
             for i in range (0, wh_size[1]):
                 for j in range (0, wh_size[0]):
-                    X_WBrickWareHouse = RigidTransform(wh_location + gBWhCell * np.array([i, j, z]))
+                    X_WBrickWareHouse = RigidTransform(wh_location + wh_cell_geom * np.array([i, j, z]))
                     self.move_brick(context, X_WBrickWareHouse, brick_cnt)
                     self.lock_brick(context, brick_cnt)
                     if brick_cnt == 0:
