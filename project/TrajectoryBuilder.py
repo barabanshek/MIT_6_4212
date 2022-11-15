@@ -97,11 +97,11 @@ class TrajectoryBuilder:
     # Generate move trajectory to the point X_WBrickTarget
     def gen_move_to_place_traj(self, X_WBrickTarget, brick_n=0):
         traj = PiecewisePolynomial.FirstOrderHold(
-                      [0.0, 4.0],
+                      [0.0, 2.0],
                           np.vstack([[(self.X_WBrickSource @ self.X_BrickSourcePreG).translation()],
                                      [(X_WBrickTarget @ self.X_BrickTargetPreG).translation()]]).T)
 
-        for i in np.arange(0.0, 4.0, 0.1):
+        for i in np.arange(0.0, 2.0, 0.1):
             R = RigidTransform(self.X_BrickSourcePreG.rotation(), traj.value(i))
             self.trajectory.append_point(0.1,
                                          R,
@@ -149,11 +149,11 @@ class TrajectoryBuilder:
 
     def gen_return_to_source_traj(self, X_WBrickTarget, brick_n=0):
         traj = PiecewisePolynomial.FirstOrderHold(
-                      [0.0, 4.0],
+                      [0.0, 2.0],
                           np.vstack([[(X_WBrickTarget @ self.X_BrickTargetPreG).translation()],
                                      [(self.X_WBrickSource @ self.X_BrickSourcePreG).translation()]]).T)
 
-        for i in np.arange(0.0, 4.0, 0.1):
+        for i in np.arange(0.0, 2.0, 0.1):
             R = RigidTransform(self.X_BrickSourcePreG.rotation(), traj.value(i))
             self.trajectory.append_point(0.1,
                                          R,
