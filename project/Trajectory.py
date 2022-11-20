@@ -7,7 +7,7 @@ from pydrake.all import (PiecewisePolynomial)
 #
 class Trajectory():
     def __init__(self):
-        # [timestamp, pose, grip_pose, metainfo, breakpoint, bounds, qs]
+        # [timestamp, pose, grip_pose, brick_n, metainfo, breakpoint, bounds, qs]
         self.traj = []
         # [timestamp]
         self.breakpoints = []
@@ -19,10 +19,10 @@ class Trajectory():
         return self.breakpoints
 
     # Add intermediate point in the trajectory
-    def append_point(self, timestamp, pose, grip_pose, metainfo, bounds, breakpoint = False, calibration_q0 = None, with_merge = True):
+    def append_point(self, timestamp, pose, grip_pose, brick_n, metainfo, bounds, breakpoint = False, calibration_q0 = None, with_merge = True):
         base_t = self.traj[-1][0] if len(self.traj) else 0
         ts = base_t + timestamp if with_merge else timestamp
-        self.traj.append([ts, pose, grip_pose, metainfo, breakpoint, bounds, None])
+        self.traj.append([ts, pose, grip_pose, brick_n, metainfo, breakpoint, bounds, None])
         if breakpoint:
             self.breakpoints.append(ts)
 
@@ -33,7 +33,7 @@ class Trajectory():
         gap = 0.0001
         base_t = self.traj[-1][0] + gap
         for trj in traj_to_merge.get_traj():
-            self.append_point(base_t + trj[0], trj[1], trj[2], trj[3], trj[4], trj[5], trj[6]);
+            self.append_point(base_t + trj[0], trj[1], trj[2], trj[3], trj[4], trj[5], trj[6], trj[7])
 
     # Shrink trajectories by scaling all timestamps for each point
     def slow_down(self, k):
@@ -43,7 +43,7 @@ class Trajectory():
 
     # Dump each point based on mask corresponding to
     # [timestamp, pose, grip_pose, metainfo, breakpoint]
-    def dump_trajectories(self, mask=[False, False, False, False, False, False, False]):
+    def dump_trajectories(self, mask=[False, False, False, False, False, False, False, False]):
         for trj in self.traj:
             dump = list(filter(lambda x: x[1] == True, zip(trj, mask)))
             print([x[0] for x in dump])
@@ -61,6 +61,9 @@ class Trajectory():
         #
         return finger_traj
 
+    def set_ik_solution(self, i, q_sol):
+        self.traj[i][7] = q_sol
+
     # Form iiwa grip and finger trajectories, grip trajectories are identified as end-effector poses;
     # Use this for PseudoInverseController-based control
     def form_iiwa_traj(self):
@@ -77,7 +80,7 @@ class Trajectory():
     def form_iiwa_traj_q(self):
         #
         traj = PiecewisePolynomial.CubicShapePreserving(np.array([t[0] for t in self.traj]),
-                                                        np.array([t[6] for t in self.traj])[:, 0:7].T)
+                                                        np.array([t[7] for t in self.traj])[:, 0:7].T)
         #
         finger_traj = self.form_iiwa_finger_traj()
         #
