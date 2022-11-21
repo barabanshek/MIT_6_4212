@@ -22,18 +22,16 @@ class Trajectory():
     def append_point(self, timestamp, pose, grip_pose, brick_n, metainfo, bounds, breakpoint = False, calibration_q0 = None, with_merge = True):
         base_t = self.traj[-1][0] if len(self.traj) else 0
         ts = base_t + timestamp if with_merge else timestamp
-        self.traj.append([ts, pose, grip_pose, brick_n, metainfo, breakpoint, bounds, None])
+        self.traj.append([ts, pose, grip_pose, brick_n, metainfo, breakpoint, bounds, calibration_q0])
         if breakpoint:
             self.breakpoints.append(ts)
 
     # Merge this trajectory with `traj_to_merge`, putting traj after
-    # Add a small constant as a gap between trajectories
     def merge_in(self, traj_to_merge):
         # Merge trajectories
-        gap = 0.0001
-        base_t = self.traj[-1][0] + gap
+        base_t = self.traj[-1][0]
         for trj in traj_to_merge.get_traj():
-            self.append_point(base_t + trj[0], trj[1], trj[2], trj[3], trj[4], trj[5], trj[6], trj[7])
+            self.append_point(base_t + trj[0], trj[1], trj[2], trj[3], trj[4], trj[6], trj[5], trj[7], False)
 
     # Shrink trajectories by scaling all timestamps for each point
     def slow_down(self, k):

@@ -37,3 +37,12 @@ class Visualizer:
 
     def clear_vis(self):
         self.meshcat_.Delete("/brick_vis")
+
+    def visualize_coverage(self, covered_bricks, not_covered_bricks):
+        # Visualize successful bricks first
+        kColGreen = Rgba(0.61, 1, 0.60)
+        self.visualize_bricks(covered_bricks, kColGreen)
+
+        # Visualize failed bricks next
+        kColRead = Rgba(1, 0.44, 0.33)
+        self.visualize_bricks(not_covered_bricks, kColRead)

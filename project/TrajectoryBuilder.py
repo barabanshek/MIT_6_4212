@@ -174,7 +174,7 @@ class TrajectoryBuilder:
                                          brick_n,
                                          'move_back #' + str(brick_n) + ' time: ' + str(i),
                                          0.15)
-        self.trajectory.append_point(4,
+        self.trajectory.append_point(0.1,
                                      self.X_WBrickSource @ self.X_BrickSourcePreG,
                                      self.finger_opened,
                                      brick_n,
@@ -186,12 +186,10 @@ class TrajectoryBuilder:
         return self.trajectory
     
     # Solve IK offline using IKOptimizationController and store the result in the trajecotry[6]
-    def solve_IK(self):
+    def solve_IK(self, q_nominal):
         ik_controller = IKOptimizationController()
-        q_nominal = np.array([ 0., 0.6, 0., 0.0, 0.0, 1, 0.0, 0., 0.]) # nominal joint for joint-centering.
 
         # Solve for all other positions
-        self.failed_bricks_ = [-1]
         num_errors = 0
         q_prev = q_nominal
         for i in range(len(self.trajectory.get_traj())):
@@ -199,38 +197,15 @@ class TrajectoryBuilder:
 
             if q_knots is None:
                 print("Failed to solve IK for trajectory point: ", self.trajectory.get_traj()[i][4])
-                # Add to failed bricks
-                if not self.failed_bricks_[-1] == self.trajectory.get_traj()[i][3]:
-                    self.failed_bricks_.append(self.trajectory.get_traj()[i][3])
-
                 num_errors = num_errors + 1
-                self.trajectory.set_ik_solution(i, q_prev)
+                self.trajectory.set_ik_solution(i, None)
             else:
                 q_prev = q_knots
                 self.trajectory.set_ik_solution(i, q_knots)
 
-        self.failed_bricks_ = np.array(self.failed_bricks_[1:])
-
-        # Print stat
-        print("IK solver: failed to solve for bricks: ", self.failed_bricks_)
-
         #
         return num_errors
 
-    def form_coverage(self, targets):
-        self.covered_bricks_ = []
-        for i in range(targets.shape[0]):
-            if not i in self.failed_bricks_:
-                self.covered_bricks_.append(i)
-        self.covered_bricks_ = np.array(self.covered_bricks_)
-
-    def visualize_coverage(self, vis, targets):
-        self.form_coverage(targets)
-
-        # Visualize successful bricks first
-        kColGreen = Rgba(0.61, 1, 0.60)
-        vis.visualize_bricks(targets[self.covered_bricks_], kColGreen)
-
-        # Visualize failed bricks next
-        kColRead = Rgba(1, 0.44, 0.33)
-        vis.visualize_bricks(targets[self.failed_bricks_], kColRead)
+    # Merge trajectory builders
+    def merge(self, trj_builder):
+        self.trajectory.merge_in(trj_builder.trajectory)
