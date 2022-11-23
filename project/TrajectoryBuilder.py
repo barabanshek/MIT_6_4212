@@ -223,25 +223,27 @@ class TrajectoryBuilder:
         return self.trajectory
     
     # Solve IK offline using IKOptimizationController and store the result in the trajecotry[6]
-    def solve_IK(self, q_nominal):
+    def solve_IK(self, q_nominal, stop_on_fail=True):
         ik_controller = IKOptimizationController()
 
         # Solve for all other positions
-        num_errors = 0
+        num_err = 0
         q_prev = q_nominal
         for i in range(len(self.trajectory.get_traj())):
             q_knots = ik_controller.solve(self.trajectory.get_traj()[i], q_prev)
 
             if q_knots is None:
                 print("Failed to solve IK for trajectory point: ", self.trajectory.get_traj()[i][4])
-                num_errors = num_errors + 1
-                self.trajectory.set_ik_solution(i, None)
+                if stop_on_fail:
+                    return 1
+                else:
+                    num_err = num_err + 1
             else:
                 q_prev = q_knots
                 self.trajectory.set_ik_solution(i, q_knots)
 
         #
-        return num_errors
+        return num_err
 
     # Merge trajectory builders
     def merge(self, trj_builder):
