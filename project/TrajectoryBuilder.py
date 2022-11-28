@@ -32,10 +32,6 @@ class TrajectoryBuilder:
                                                np.array([0, 0, 0.25]))
         self.X_BrickTargetG = RigidTransform(RotationMatrix.MakeXRotation(-np.pi/2),
                                             np.array([0, 0, 0.09]))
-        self.X_BrickTargetPreG_rot = RigidTransform(RotationMatrix.MakeXRotation(-np.pi/2) @ RotationMatrix.MakeYRotation(-np.pi/2),
-                                               np.array([0, 0, 0.25]))
-        self.X_BrickTargetG_rot = RigidTransform(RotationMatrix.MakeXRotation(-np.pi/2) @ RotationMatrix.MakeYRotation(-np.pi/2),
-                                            np.array([0, 0, 0.09]))
         self.finger_opened = np.array([0.15])
         self.finger_closed = np.array([0.05])
 
@@ -55,173 +51,119 @@ class TrajectoryBuilder:
                                      0,
                                      'calibration',
                                      0.0,
-                                     True)
+                                     interpolate=True)
 
     def gen_grab_brick_traj(self, brick_n=0):
-        # Two points
-        X_B1 = self.X_WBrickSource @ self.X_BrickSourcePreG
-        X_B2 = self.X_WBrickSource @ self.X_BrickSourceG
-        # Open grip
+        # Initial point
         self.trajectory.append_point(0.00001,
-                                     X_B1,
-                                     self.finger_opened,
-                                     brick_n,
-                                     'grab brick #' + str(brick_n) + ' finger open',
-                                     0.0)
-        # Approach
-        traj1 = PiecewisePolynomial.FirstOrderHold(
-                      [0.0, 4.0],
-                          np.vstack([[X_B1.translation()],
-                                     [X_B2.translation()]]).T)
-        for i in np.arange(0.0, 4.0, 0.5):
-            self.trajectory.append_point(0.5,
-                                         RigidTransform(X_B2.rotation(), traj1.value(i)),
-                                         self.finger_opened,
-                                         brick_n,
-                                         'grab brick #' + str(brick_n) + ' approach (' + str(i) + ')',
-                                         0.0)
-        # Grab
-        self.trajectory.append_point(2,
-                                     X_B2,
-                                     self.finger_opened,
-                                     brick_n,
-                                     'grab brick #' + str(brick_n) + ' finger close 1',
-                                     0.0)
-        self.trajectory.append_point(2,
-                                     X_B2,
-                                     self.finger_closed,
-                                     brick_n,
-                                     'grab brick #' + str(brick_n) + ' finger close 2',
-                                     0.0)
-        # Withdraw
-        traj2 = PiecewisePolynomial.FirstOrderHold(
-                      [0.0, 4.0],
-                          np.vstack([[X_B2.translation()],
-                                     [X_B1.translation()]]).T)
-        for i in np.arange(0.0, 4.0, 0.5):
-            self.trajectory.append_point(0.5,
-                                         RigidTransform(X_B1.rotation(), traj2.value(i)),
-                                         self.finger_closed,
-                                         brick_n,
-                                         'grab brick #' + str(brick_n) + ' withdraw (' + str(i) + ')',
-                                         0.0)
-
-    # Generate move trajectory to the point X_WBrickTarget
-    def gen_move_to_place_traj(self, X_WBrickTarget, brick_n=0):
-        traj = PiecewisePolynomial.FirstOrderHold(
-                      [0.0, 2.0],
-                          np.vstack([[self.X_WBrickSource.translation() + self.X_BrickSourcePreG.translation()],
-                                     [X_WBrickTarget.translation() + self.X_BrickTargetPreG.translation()]]).T)
-
-        for i in np.arange(0.0, 2.0, 0.1):
-            R = RigidTransform(self.X_BrickTargetPreG.rotation(), traj.value(i))
-            self.trajectory.append_point(0.1,
-                                         R,
-                                         self.finger_closed,
-                                         brick_n,
-                                         'move #' + str(brick_n) + ' time: ' + str(i),
-                                         0.15)
-
-    def gen_place_brick_traj(self, X_WBrickTarget, orientation, brick_n=0):
-        # Turn if needed
-        if orientation == 0:
-            traj3 = PiecewisePolynomial.FirstOrderHold(
-                        [0.0, 2.0],
-                            np.vstack([[0],
-                                        [-np.pi/2]]).T)
-            for i in np.arange(0.0, 2.0 + 0.5, 0.5):
-                self.trajectory.append_point(0.5,
-                                            RigidTransform(self.X_BrickTargetPreG.rotation() @ RotationMatrix.MakeYRotation(traj3.value(i)), X_WBrickTarget.translation() + self.X_BrickTargetPreG.translation()),
-                                            self.finger_closed,
-                                            brick_n,
-                                            'place brick #' + str(brick_n) + ' turn (' + str(i) + ')',
-                                            0.0)
-
-            # Two points
-            X_B1 = X_WBrickTarget @ self.X_BrickTargetPreG_rot
-            X_B2 = X_WBrickTarget @ self.X_BrickTargetG_rot
-        else:
-            # Two points
-            X_B1 = X_WBrickTarget @ self.X_BrickTargetPreG
-            X_B2 = X_WBrickTarget @ self.X_BrickTargetG
-
-        # Approach
-        traj1 = PiecewisePolynomial.FirstOrderHold(
-                      [0.0, 4.0],
-                          np.vstack([[X_B1.translation()],
-                                     [X_B2.translation()]]).T)
-        for i in np.arange(0.0, 4.0, 0.5):
-            self.trajectory.append_point(0.5,
-                                         RigidTransform(X_B2.rotation(), traj1.value(i)),
-                                         self.finger_closed,
-                                         brick_n,
-                                         'place brick #' + str(brick_n) + ' approach (' + str(i) + ')',
-                                         0.0)
-        # Open
-        self.trajectory.append_point(2,
-                                     X_B2,
-                                     self.finger_closed,
-                                     brick_n,
-                                     'place brick #' + str(brick_n) + ' finger open 1',
-                                     0.0)
-        self.trajectory.append_point(2,
-                                     X_B2,
-                                     self.finger_opened,
-                                     brick_n,
-                                     'place brick #' + str(brick_n) + ' finger open 2',
-                                     0.0)
-        # Withdraw
-        traj2 = PiecewisePolynomial.FirstOrderHold(
-                      [0.0, 4.0],
-                          np.vstack([[X_B2.translation()],
-                                     [X_B1.translation()]]).T)
-        for i in np.arange(0.0, 4.0, 0.5):
-            self.trajectory.append_point(0.5,
-                                         RigidTransform(X_B1.rotation(), traj2.value(i)),
-                                         self.finger_opened,
-                                         brick_n,
-                                         'place brick #' + str(brick_n) + ' withdraw (' + str(i) + ')',
-                                         0.0)
-
-        # Rotate back if needed
-        if orientation == 0:
-            traj3 = PiecewisePolynomial.FirstOrderHold(
-                        [0.0, 2.0],
-                            np.vstack([[0],
-                                        [np.pi/2]]).T)
-            for i in np.arange(0.0, 2.0 + 0.5, 0.5):
-                self.trajectory.append_point(0.5,
-                                            RigidTransform(self.X_BrickTargetPreG_rot.rotation() @ RotationMatrix.MakeYRotation(traj3.value(i)), X_WBrickTarget.translation() + self.X_BrickTargetPreG.translation()),
-                                            self.finger_closed,
-                                            brick_n,
-                                            'place brick #' + str(brick_n) + ' turn (' + str(i) + ')',
-                                            0.0)
-
-    def gen_return_to_source_traj(self, X_WBrickTarget, brick_n=0):
-        traj = PiecewisePolynomial.FirstOrderHold(
-                      [0.0, 2.0],
-                          np.vstack([[X_WBrickTarget.translation() + self.X_BrickTargetPreG.translation()],
-                                     [self.X_WBrickSource.translation() + self.X_BrickSourcePreG.translation()]]).T)
-
-        for i in np.arange(0.0, 2.0, 0.1):
-            R = RigidTransform(self.X_BrickSourcePreG.rotation(), traj.value(i))
-            self.trajectory.append_point(0.1,
-                                         R,
-                                         self.finger_opened,
-                                         brick_n,
-                                         'move_back #' + str(brick_n) + ' time: ' + str(i),
-                                         0.15)
-        self.trajectory.append_point(0.1,
                                      self.X_WBrickSource @ self.X_BrickSourcePreG,
                                      self.finger_opened,
                                      brick_n,
-                                     'go_back_end/calibration #' + str(brick_n),
+                                     'grab brick #' + str(brick_n) + ' initial ',
+                                      0.0,
+                                      breakpoint=True,
+                                      interpolate=False)
+
+        # Approach
+        self.trajectory.append_point(2,
+                                     self.X_WBrickSource @ self.X_BrickSourceG,
+                                     self.finger_opened,
+                                     brick_n,
+                                     'grab brick #' + str(brick_n) + ' approach',
+                                      0.0,
+                                      interpolate=True)
+
+        # Grab
+        self.trajectory.append_point(0.5,
+                                     self.X_WBrickSource @ self.X_BrickSourceG,
+                                     self.finger_closed,
+                                     brick_n,
+                                     'grab brick #' + str(brick_n) + ' finger close',
                                      0.0,
-                                     True)
+                                     interpolate=False)
+
+        # Withdraw   
+        self.trajectory.append_point(2,
+                                     self.X_WBrickSource @ self.X_BrickSourcePreG,
+                                     self.finger_closed,
+                                     brick_n,
+                                     'grab brick #' + str(brick_n) + ' withdraw',
+                                     0.0,
+                                     interpolate=True)
+
+    # Generate move trajectory to the point X_WBrickTarget
+    def gen_move_to_place_traj(self, X_WBrickTarget, brick_n=0):
+        self.trajectory.append_point(2,
+                                     X_WBrickTarget @ self.X_BrickTargetPreG,
+                                     self.finger_closed,
+                                     brick_n,
+                                     'grab brick #' + str(brick_n) + ' withdraw',
+                                     0.0,
+                                     interpolate=True)
+
+    def gen_place_brick_traj(self, X_WBrickTarget, orientation, brick_n=0):
+        # Turn if needed
+        R_Orientation = RotationMatrix.MakeYRotation(-np.pi/2) if orientation == 0 else RotationMatrix()
+        R = RigidTransform(R_Orientation, np.array([0.0, 0.0, 0.0]))
+
+        if orientation == 0:
+            self.trajectory.append_point(0.5,
+                                        X_WBrickTarget @ (self.X_BrickTargetPreG @ R),
+                                        self.finger_closed,
+                                        brick_n,
+                                        'place brick #' + str(brick_n) + ' turn',
+                                        0.0,
+                                        interpolate=True)
+
+        # Approach
+        self.trajectory.append_point(2,
+                                     X_WBrickTarget @ (self.X_BrickTargetG @ R),
+                                     self.finger_closed,
+                                     brick_n,
+                                     'place brick #' + str(brick_n) + ' approach',
+                                     0.0,
+                                     interpolate=True)
+
+        # Open
+        self.trajectory.append_point(0.5,
+                                     X_WBrickTarget @ (self.X_BrickTargetG @ R),
+                                     self.finger_opened,
+                                     brick_n,
+                                     'place brick #' + str(brick_n) + ' open',
+                                     0.0,
+                                     interpolate=False)
+
+        # Withdraw
+        self.trajectory.append_point(2,
+                                     X_WBrickTarget @ (self.X_BrickTargetPreG @ R),
+                                     self.finger_opened,
+                                     brick_n,
+                                     'place brick #' + str(brick_n) + ' withdraw',
+                                     0.0,
+                                     interpolate=True)
+
+        # Rotate back if needed
+        if orientation == 0:
+            self.trajectory.append_point(0.5,
+                                        X_WBrickTarget @ self.X_BrickTargetPreG,
+                                        self.finger_opened,
+                                        brick_n,
+                                        'place brick #' + str(brick_n) + ' turn',
+                                        0.0,
+                                        interpolate=True)
+
+    def gen_return_to_source_traj(self, X_WBrickTarget, brick_n=0):
+        self.trajectory.append_point(2,
+                                     self.X_WBrickSource @ self.X_BrickSourcePreG,
+                                     self.finger_opened,
+                                     brick_n,
+                                     'move back #' + str(brick_n),
+                                     0.0,
+                                     interpolate=True)
 
     def get_trajectories(self):
         return self.trajectory
-    
+
     # Solve IK offline using IKOptimizationController and store the result in the trajecotry[6]
     def solve_IK(self, q_nominal, stop_on_fail=True):
         ik_controller = IKOptimizationController()

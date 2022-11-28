@@ -1,6 +1,6 @@
 # Bookkeeping
 import numpy as np
-from pydrake.all import (PiecewisePolynomial)
+from pydrake.all import (PiecewisePolynomial, PiecewisePose)
 
 #
 # Trajectory class: define and manipulate trajectories
@@ -19,10 +19,43 @@ class Trajectory():
         return self.breakpoints
 
     # Add intermediate point in the trajectory
-    def append_point(self, timestamp, pose, grip_pose, brick_n, metainfo, bounds, breakpoint = False, calibration_q0 = None, with_merge = True):
+    def append_point(self,
+                     timestamp, 
+                     pose,
+                     grip_pose,
+                     brick_n,
+                     metainfo,
+                     bounds,
+                     breakpoint = False,
+                     calibration_q0 = None,
+                     with_merge = True,
+                     interpolate = False):
+        # Adjust time
         base_t = self.traj[-1][0] if len(self.traj) else 0
         ts = base_t + timestamp if with_merge else timestamp
-        self.traj.append([ts, pose, grip_pose, brick_n, metainfo, breakpoint, bounds, calibration_q0])
+
+        # Append points (interpolate if requested)
+        if interpolate:
+            kStep = 0.1
+
+            if not with_merge:
+                assert False, "Can not be"
+
+            k = PiecewisePose.MakeLinear([base_t + kStep, ts], 
+                                        [self.traj[-1][1], pose])
+            for i in np.arange(base_t + kStep, ts + kStep, kStep):
+                self.traj.append([i,
+                                 k.GetPose(i),
+                                 grip_pose,
+                                 brick_n,
+                                 metainfo,
+                                 False,
+                                 bounds,
+                                 calibration_q0])
+        else:
+            self.traj.append([ts, pose, grip_pose, brick_n, metainfo, breakpoint, bounds, calibration_q0])
+
+        # Add to breakpoints
         if breakpoint:
             self.breakpoints.append(ts)
 
