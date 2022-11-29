@@ -7,7 +7,7 @@ from pydrake.all import (PiecewisePolynomial, PiecewisePose)
 #
 class Trajectory():
     def __init__(self):
-        # [timestamp, pose, grip_pose, brick_n, metainfo, breakpoint, bounds, qs]
+        # [timestamp, pose, grip_pose, brick_n, metainfo, bounds, qs]
         self.traj = []
         # [timestamp]
         self.breakpoints = []
@@ -27,20 +27,14 @@ class Trajectory():
                      metainfo,
                      bounds,
                      breakpoint = False,
-                     calibration_q0 = None,
-                     with_merge = True,
                      interpolate = False):
         # Adjust time
         base_t = self.traj[-1][0] if len(self.traj) else 0
-        ts = base_t + timestamp if with_merge else timestamp
+        ts = base_t + timestamp
 
         # Append points (interpolate if requested)
         if interpolate:
             kStep = 0.1
-
-            if not with_merge:
-                assert False, "Can not be"
-
             k = PiecewisePose.MakeLinear([base_t + kStep, ts], 
                                         [self.traj[-1][1], pose])
             for i in np.arange(base_t + kStep, ts + kStep, kStep):
@@ -49,11 +43,10 @@ class Trajectory():
                                  grip_pose,
                                  brick_n,
                                  metainfo,
-                                 False,
                                  bounds,
-                                 calibration_q0])
+                                 None])
         else:
-            self.traj.append([ts, pose, grip_pose, brick_n, metainfo, breakpoint, bounds, calibration_q0])
+            self.traj.append([ts, pose, grip_pose, brick_n, metainfo, bounds, None])
 
         # Add to breakpoints
         if breakpoint:
@@ -61,10 +54,16 @@ class Trajectory():
 
     # Merge this trajectory with `traj_to_merge`, putting traj after
     def merge_in(self, traj_to_merge):
-        # Merge trajectories
         base_t = self.traj[-1][0]
+
+        # Merge trajectories
         for trj in traj_to_merge.get_traj():
-            self.append_point(base_t + trj[0], trj[1], trj[2], trj[3], trj[4], trj[6], trj[5], trj[7], False)
+            trj[0] = base_t + trj[0]
+            self.traj.append(trj)
+
+        # Merge breakpooints
+        for bp in traj_to_merge.get_breakpoints():
+            self.breakpoints.append(base_t + bp)
 
     # Shrink trajectories by scaling all timestamps for each point
     def slow_down(self, k):
@@ -74,7 +73,7 @@ class Trajectory():
 
     # Dump each point based on mask corresponding to
     # [timestamp, pose, grip_pose, metainfo, breakpoint]
-    def dump_trajectories(self, mask=[False, False, False, False, False, False, False, False]):
+    def dump_trajectories(self, mask=[False, False, False, False, False, False, False]):
         for trj in self.traj:
             dump = list(filter(lambda x: x[1] == True, zip(trj, mask)))
             print([x[0] for x in dump])
@@ -93,7 +92,10 @@ class Trajectory():
         return finger_traj
 
     def set_ik_solution(self, i, q_sol):
-        self.traj[i][7] = q_sol
+        self.traj[i][6] = q_sol
+
+    def get_qs(self, i):
+        return self.traj[i][6]
 
     # Form iiwa grip and finger trajectories, grip trajectories are identified as end-effector poses;
     # Use this for PseudoInverseController-based control
@@ -111,7 +113,7 @@ class Trajectory():
     def form_iiwa_traj_q(self):
         #
         traj = PiecewisePolynomial.CubicShapePreserving(np.array([t[0] for t in self.traj]),
-                                                        np.array([t[7] for t in self.traj])[:, 0:7].T)
+                                                        np.array([t[6] for t in self.traj])[:, 0:7].T)
         #
         finger_traj = self.form_iiwa_finger_traj()
         #

@@ -51,5 +51,5 @@ class Visualizer:
         self.visualize_bricks(not_covered_bricks, kColRead)
 
     def visualize_plan(self, bricks):
-        kColGreen = Rgba(0.61, 1, 0.60)
+        kColGreen = Rgba(0.0, 0.8, 0.0)
         self.visualize_bricks(bricks, kColGreen, False)
