@@ -97,7 +97,7 @@ class TrajectoryBuilder:
                                      X_WBrickTarget @ self.X_BrickTargetPreG,
                                      self.finger_closed,
                                      brick_n,
-                                     'grab brick #' + str(brick_n) + ' withdraw',
+                                     'move brick #' + str(brick_n),
                                      0.0,
                                      interpolate=True)
 
