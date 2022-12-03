@@ -61,7 +61,7 @@ class IKOptimizationController():
             p_AQ_lower=p_WG_lower, p_AQ_upper=p_WG_upper)
 
     def solve(self, traj_fragment, q_guess):
-        ik = inverse_kinematics.InverseKinematics(self.plant)
+        ik = inverse_kinematics.InverseKinematics(self.plant, with_joint_limits=True)
         q_variables = ik.q()
         prog = ik.prog()
 
