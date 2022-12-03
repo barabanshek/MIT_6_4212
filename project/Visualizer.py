@@ -54,9 +54,11 @@ class Visualizer:
         kColGreen = Rgba(0.0, 0.8, 0.0)
         self.visualize_bricks(bricks, kColGreen, False)
 
-    def visualize_traj(self, points):
-        self.meshcat_.Delete("/traj_vis")
+    def visualize_traj(self, points, brick_id=0):
         kColBlack = Rgba(0.0, 0.0, 0.0)
         cloud = PointCloud(points.shape[0])
         cloud.mutable_xyzs()[:] = points.T
-        self.meshcat_.SetObject("/traj_vis/", cloud, rgba=kColBlack, point_size=0.01)
+        self.meshcat_.SetObject("/traj_vis/" + str(brick_id), cloud, rgba=kColBlack, point_size=0.01)
+
+    def clear_traj(self):
+        self.meshcat_.Delete("/traj_vis")
