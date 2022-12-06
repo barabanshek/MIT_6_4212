@@ -111,6 +111,7 @@ class Trajectory():
     # Form iiwa grip and finger trajectories, grop trajectories are identified as joint positions (q);
     # Use this for IK-based control
     def form_iiwa_traj_q(self):
+        #self.dump_trajectories([True, False, False, False, False, False, True])
         #
         traj = PiecewisePolynomial.CubicShapePreserving(np.array([t[0] for t in self.traj]),
                                                         np.array([t[6] for t in self.traj])[:, 0:7].T)

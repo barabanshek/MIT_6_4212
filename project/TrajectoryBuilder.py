@@ -145,16 +145,66 @@ class TrajectoryBuilder:
                                      interpolate=True)
 
     # Generate move trajectory to the point X_WBrickTarget
-    def gen_move_to_place_traj(self, X_WBrickTarget, brick_n=0):
+    def gen_move_to_place_traj(self, q0, X_WBrickTarget, brick_n=0):
+        c_opt = IKOptimizationController()
+
+        P1 = self.X_WBrickSource @ self.X_BrickSourcePreG
+        P2 =  X_WBrickTarget @ self.X_BrickTargetPreG
+
+        #print(P1, P2)
+
+        step, t = c_opt.solve_(q0, P1, P2)
+        if t == None:
+            print("Failed to construct Move trajectory")
+            assert False
+
+        for r in t:
+            self.trajectory.append_point(step,
+                                         r[1],
+                                         self.finger_closed,
+                                         brick_n,
+                                         'move brick #' + str(brick_n),
+                                         0.0,
+                                         interpolate=False)
+            self.trajectory.set_ik_solution(-1, r[0])
+
+        return t[-1][0], (t, step)
+
+    def move_back(self, q0, X_WBrickTarget, brick_n=0):
+        c_opt = IKOptimizationController()
+
+        P2 = self.X_WBrickSource @ self.X_BrickSourcePreG
+        P1 =  X_WBrickTarget @ self.X_BrickTargetPreG
+
+        #print(P1, P2)
+
+        step, t = c_opt.solve_(q0, P1, P2)
+        if t == None:
+            print("Failed to construct Move back trajectory")
+            assert False
+
+        for r in t:
+            self.trajectory.append_point(step,
+                                         r[1],
+                                         self.finger_closed,
+                                         brick_n,
+                                         'move back brick #' + str(brick_n),
+                                         0.0,
+                                         interpolate=False)
+            self.trajectory.set_ik_solution(-1, r[0])
+
+        return t[-1][0], (t, step)
+
+    def gen_place_brick_traj(self, X_WBrickTarget, orientation, brick_n=0):
+        # Pre-approach
         self.trajectory.append_point(2,
                                      X_WBrickTarget @ self.X_BrickTargetPreG,
                                      self.finger_closed,
                                      brick_n,
-                                     'move brick #' + str(brick_n),
+                                     'place brick pre-approach #' + str(brick_n),
                                      0.0,
                                      interpolate=True)
 
-    def gen_place_brick_traj(self, X_WBrickTarget, orientation, brick_n=0):
         # Turn if needed
         R_Orientation = RotationMatrix.MakeYRotation(-np.pi/2) if orientation == 0 else RotationMatrix()
         R = RigidTransform(R_Orientation, np.array([0.0, 0.0, 0.0]))
@@ -212,7 +262,7 @@ class TrajectoryBuilder:
                                      brick_n,
                                      'move back #' + str(brick_n),
                                      0.0,
-                                     interpolate=True)
+                                     interpolate=False)
 
     def get_trajectories(self):
         return self.trajectory
@@ -238,6 +288,7 @@ class TrajectoryBuilder:
             else:
                 q_prev = q_knots
                 self.trajectory.set_ik_solution(i, q_knots)
+                #print("q_knots= ", q_knots)
         #
         return (True, q_prev)
 

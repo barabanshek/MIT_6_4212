@@ -9,7 +9,8 @@ from pydrake.all import (AddMultibodyPlantSceneGraph, AngleAxis, BasicVector,
                          MultibodyPositionToGeometryPose, Parser,
                          PiecewisePose, Quaternion, RigidTransform,
                          RollPitchYaw, RotationMatrix, SceneGraph, Simulator,
-                         StartMeshcat, TrajectorySource, GenerateHtml, GetDrakePath, PiecewisePolynomial, Solve)
+                         StartMeshcat, TrajectorySource, GenerateHtml, GetDrakePath, PiecewisePolynomial, Solve, KinematicTrajectoryOptimization, PositionConstraint, AddMultibodyPlantSceneGraph, OrientationConstraint, MinimumDistanceConstraint)
+from manipulation.scenarios import AddIiwa, AddPlanarIiwa, AddShape, AddWsg
 
 #
 # IK-based controller class
@@ -74,3 +75,92 @@ class IKOptimizationController():
             return None
         else:
             return result.GetSolution(q_variables)
+
+    def solve_(self, q0, X_WStart, X_WGoal):
+        builder = DiagramBuilder()
+        self.plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.001)
+        iiwa = AddIiwa(self.plant)
+        wsg = AddWsg(self.plant, iiwa, roll=0.0, welded=True, sphere=True)
+        self.plant.Finalize()
+        self.diagram = builder.Build()
+        self.context = self.diagram.CreateDefaultContext()
+        self.plant_context = self.plant.GetMyContextFromRoot(self.context)
+        self.gripper_frame = self.plant.GetFrameByName('body')
+
+        self.plant.SetPositions(self.plant_context, q0[:7])
+        
+        num_q = self.plant.num_positions()
+
+        trajopt = KinematicTrajectoryOptimization(self.plant.num_positions(), 10)
+        prog = trajopt.get_mutable_prog()
+        trajopt.AddDurationCost(1.0)
+        trajopt.AddPathLengthCost(1.0)
+        trajopt.AddPositionBounds(self.plant.GetPositionLowerLimits(),
+                                self.plant.GetPositionUpperLimits())
+        trajopt.AddVelocityBounds(self.plant.GetVelocityLowerLimits(),
+                                self.plant.GetVelocityUpperLimits())
+
+        trajopt.AddDurationConstraint(2, 50)
+
+        # start constraint
+        start_constraint = PositionConstraint(self.plant, self.plant.world_frame(),
+                                            X_WStart.translation(),
+                                            X_WStart.translation(), self.gripper_frame,
+                                            [0, 0, 0], self.plant_context)
+        trajopt.AddPathPositionConstraint(start_constraint, 0)
+        prog.AddQuadraticErrorCost(np.eye(num_q), q0,
+                                trajopt.control_points()[:, 0])
+
+        # goal constraint
+        goal_constraint = PositionConstraint(self.plant, self.plant.world_frame(),
+                                            X_WGoal.translation(),
+                                            X_WGoal.translation(), self.gripper_frame,
+                                            [0, 0, 0], self.plant_context)
+        trajopt.AddPathPositionConstraint(goal_constraint, 1)
+        prog.AddQuadraticErrorCost(np.eye(num_q), q0,
+                                trajopt.control_points()[:, -1])
+
+        # start and end with zero velocity
+        #trajopt.AddPathVelocityConstraint(np.zeros((num_q, 1)), np.zeros(
+        #    (num_q, 1)), 0)
+        #trajopt.AddPathVelocityConstraint(np.zeros((num_q, 1)), np.zeros(
+        #    (num_q, 1)), 1)
+
+        print("Solving...")
+        result = Solve(prog)
+        if not result.is_success():
+            return None, None
+
+        trajopt.SetInitialGuess(trajopt.ReconstructTrajectory(result))
+        # collision constraints
+        orientation_constraint = OrientationConstraint(self.plant,
+                                                    self.plant.world_frame(),
+                                                    RotationMatrix.MakeXRotation(-np.pi/2),
+                                                    self.gripper_frame,
+                                                    RotationMatrix(),
+                                                    0.1,
+                                                    self.plant_context
+                                                )
+        evaluate_at_s = np.linspace(0, 1, 25)
+        for s in evaluate_at_s:
+            trajopt.AddPathPositionConstraint(orientation_constraint, s)
+
+        print("Solving_1...")
+        result = Solve(prog)
+        if not result.is_success():
+            return None, None
+
+        ret = []
+        t = trajopt.ReconstructTrajectory(result)
+        step = (t.end_time() - t.start_time())/10
+        for i in np.arange(t.start_time(), t.end_time() + step, step):
+            q = t.value(i)
+            self.plant.SetPositions(self.plant_context, iiwa, q)
+            gripper = self.plant.GetBodyByName("body", wsg)
+            pose = self.plant.EvalBodyPoseInWorld(self.plant_context, gripper)
+
+            q_all = np.append(q, [0, 0])
+            ret.append([q_all, pose])
+
+
+        return step, ret
