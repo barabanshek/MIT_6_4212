@@ -129,6 +129,28 @@ class TrajectoryBuilder:
 
         return points
 
+    @staticmethod
+    def generate_bypass(R, Rc, P1, P2):
+        if TrajectoryBuilder.check_for_penetration_with_the_robot(Rc, R, P1, P2):
+            bypass_P = TrajectoryBuilder.generate_bypass_trajectory(R, Rc, P1, P2)
+            bypass_P_pairs = []
+            for p in bypass_P:
+                L = TrajectoryBuilder.get_line_through_two_points(p, Rc)
+                P11, P22 = TrajectoryBuilder.get_line_intersection_with_circle(L, R, Rc)
+                PP = TrajectoryBuilder.get_closest_point(P11, P22, p)
+                L_tg = TrajectoryBuilder.get_tangental_line_at_point(PP, Rc, R)
+                #
+                L1 = TrajectoryBuilder.get_line_through_two_points(p, P1)
+                L2 = TrajectoryBuilder.get_line_through_two_points(p, P2)
+                p1 = TrajectoryBuilder.get_line_intersection_point(L_tg, L1)
+                p2 = TrajectoryBuilder.get_line_intersection_point(L_tg, L2)
+                #
+                bypass_P_pairs.append([p1, p2])
+        else:
+            bypass_P_pairs = [[P1, P2]]
+
+        return bypass_P_pairs
+
     def gen_initial_traj(self):
         self.trajectory.append_point(0,
                                      self.system.get_X_WG(),
