@@ -76,6 +76,44 @@ class TrajectoryBuilder:
         #
         return (x, y)
 
+    @staticmethod
+    def get_line_through_two_points(P1, P2):
+        k = (P1[1] - P2[1])/(P1[0] - P2[0])
+        b = P1[1] - k * P1[0]
+        #
+        return (k, b)
+
+    @staticmethod
+    def get_line_intersection_with_circle(L, R, Rc):
+        A = L[0] ** 2 + 1
+        B = 2*(L[0]*L[1] - L[0]*Rc[1] - Rc[0])
+        C = Rc[1] ** 2 - R ** 2 + Rc[0] ** 2 - 2*L[1]*Rc[1] + Rc[1] ** 2
+        x1 = (-B + np.sqrt(B ** 2 - 4*A*C))/(2*A)
+        x2 = (-B - np.sqrt(B ** 2 - 4*A*C))/(2*A)
+        y1 = L[0]*x1 + L[1]
+        y2 = L[0]*x2 + L[1]
+        #
+        return (x1, y1), (x2, y2)
+
+    @staticmethod
+    def get_closest_point(P1, P2, P):
+        dist1 = np.linalg.norm(np.array(P) - np.array(P1))
+        dist2 = np.linalg.norm(np.array(P) - np.array(P2))
+        if (dist1 <= dist2):
+            return P1
+        else:
+            return P2
+
+    @staticmethod
+    def get_tangental_line_at_point(Pa, Rc, R):
+        Pa_X = Pa[0] - Rc[0]
+        Pa_Y = Pa[1] - Rc[1]
+        #
+        k = (-Pa_X*Pa_Y)/(R * R - Pa_X * Pa_X)
+        b = Pa_Y - k * Pa_X + Rc[1] - k * Rc[0]
+        #
+        return (k, b)
+
     # Generate a trajectory from point P1 to P2 such that the grip never penetrates the area defined as a circle R at Rc
     @staticmethod
     def generate_bypass_trajectory(R, Rc, P1, P2, plot=False):
