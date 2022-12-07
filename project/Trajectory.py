@@ -9,14 +9,9 @@ class Trajectory():
     def __init__(self):
         # [timestamp, pose, grip_pose, brick_n, metainfo, bounds, qs]
         self.traj = []
-        # [timestamp]
-        self.breakpoints = []
 
     def get_traj(self):
         return self.traj
-    
-    def get_breakpoints(self):
-        return self.breakpoints
 
     # Add intermediate point in the trajectory
     def append_point(self,
@@ -26,10 +21,9 @@ class Trajectory():
                      brick_n,
                      metainfo,
                      bounds,
-                     breakpoint = False,
                      interpolate = False):
         # Adjust time
-        base_t = 0 #self.traj[-1][0] if len(self.traj) else 0
+        base_t = 0
         ts = base_t + timestamp
 
         # Append points (interpolate if requested)
@@ -48,10 +42,6 @@ class Trajectory():
         else:
             self.traj.append([ts, pose, grip_pose, brick_n, metainfo, bounds, None])
 
-        # Add to breakpoints
-        if breakpoint:
-            self.breakpoints.append(ts)
-
     def append_point_simple(self, point):
         self.traj.append(point)
 
@@ -61,26 +51,16 @@ class Trajectory():
         for trj in traj_to_merge.get_traj():
             self.traj.append(trj)
 
-        # Merge breakpooints
-        for bp in traj_to_merge.get_breakpoints():
-            self.breakpoints.append(bp)
-
     # Shrink trajectories by scaling all timestamps for each point
     def slow_down(self, k):
         for trj in self.traj:
             trj[0] = trj[0] * k
-        self.breakpoints = [x * k for x in self.breakpoints]
 
-    # Dump each point based on mask corresponding to
-    # [timestamp, pose, grip_pose, metainfo, breakpoint]
+    # Dump each point based on the mask
     def dump_trajectories(self, mask=[False, False, False, False, False, False, False]):
         for trj in self.traj:
             dump = list(filter(lambda x: x[1] == True, zip(trj, mask)))
             print([x[0] for x in dump])
-
-    def dump_breakpoints(self):
-        for bp in self.breakpoints:
-            print(bp)
 
     def form_iiwa_finger_traj(self):
         finger_traj = PiecewisePolynomial.FirstOrderHold([self.traj[0][0], self.traj[1][0]], 
@@ -96,17 +76,6 @@ class Trajectory():
 
     def get_qs(self, i):
         return self.traj[i][6]
-
-    # Form iiwa grip and finger trajectories, grip trajectories are identified as end-effector poses;
-    # Use this for PseudoInverseController-based control
-    def form_iiwa_traj(self):
-        #
-        traj = PiecewisePose.MakeLinear(np.array([t[0] for t in self.traj]), 
-                                        np.array([t[1] for t in self.traj]))
-        #
-        finger_traj = self.form_iiwa_finger_traj()
-        #
-        return (traj, finger_traj)
 
     # Form iiwa grip and finger trajectories, grop trajectories are identified as joint positions (q);
     # Use this for IK-based control

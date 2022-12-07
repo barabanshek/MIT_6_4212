@@ -173,7 +173,6 @@ class TrajectoryBuilder:
                                      brick_n,
                                      'grab brick #' + str(brick_n) + ' initial ',
                                       0.0,
-                                      breakpoint=True,
                                       interpolate=False)
 
         # Approach
