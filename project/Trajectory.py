@@ -29,7 +29,7 @@ class Trajectory():
                      breakpoint = False,
                      interpolate = False):
         # Adjust time
-        base_t = self.traj[-1][0] if len(self.traj) else 0
+        base_t = 0 #self.traj[-1][0] if len(self.traj) else 0
         ts = base_t + timestamp
 
         # Append points (interpolate if requested)
@@ -38,7 +38,7 @@ class Trajectory():
             k = PiecewisePose.MakeLinear([base_t + kStep, ts], 
                                         [self.traj[-1][1], pose])
             for i in np.arange(base_t + kStep, ts + kStep, kStep):
-                self.traj.append([i,
+                self.traj.append([kStep,
                                  k.GetPose(i),
                                  grip_pose,
                                  brick_n,
@@ -52,18 +52,18 @@ class Trajectory():
         if breakpoint:
             self.breakpoints.append(ts)
 
+    def append_point_simple(self, point):
+        self.traj.append(point)
+
     # Merge this trajectory with `traj_to_merge`, putting traj after
     def merge_in(self, traj_to_merge):
-        base_t = self.traj[-1][0]
-
         # Merge trajectories
         for trj in traj_to_merge.get_traj():
-            trj[0] = base_t + trj[0]
             self.traj.append(trj)
 
         # Merge breakpooints
         for bp in traj_to_merge.get_breakpoints():
-            self.breakpoints.append(base_t + bp)
+            self.breakpoints.append(bp)
 
     # Shrink trajectories by scaling all timestamps for each point
     def slow_down(self, k):
