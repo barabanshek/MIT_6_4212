@@ -13,29 +13,30 @@ from Trajectory import *
 from TrajectoryBuilder import *
 
 class HighPerformanceTrajectoryBuilder:
-    def __init__(self, system, planer, X_WBrickSource, num_of_bricks, num_of_workers, q0):
-        self.system = system
+    def __init__(self, planer, X_WBrickSource, brick_to_cover, num_of_workers, q0, robot_pose=None):
         self.planer = planer
         self.q0 = q0
-        self.num_of_bricks = num_of_bricks
+        self.brick_to_cover = brick_to_cover
+        self.num_of_bricks = len(brick_to_cover)
         self.X_WBrickSource = X_WBrickSource
+        self.robot_pose = robot_pose
 
         #
         print("Initializing HPC trajectory builder with ", num_of_workers, " workers on ", cpu_count(), " core machine")
 
         # Instantiate multiple trajectory builders and partition work
-        bricks_per_worker = (int)(num_of_bricks / num_of_workers)
+        bricks_per_worker = (int)(self.num_of_bricks / num_of_workers)
         current_bricks = 0
         self.traj_builders = {}
         for i in range(num_of_workers):
             if i == num_of_workers - 1:
-                remaining_bricks = num_of_bricks - current_bricks
-                self.traj_builders[i] = range(current_bricks, current_bricks + remaining_bricks)
+                remaining_bricks = self.num_of_bricks - current_bricks
+                self.traj_builders[i] = brick_to_cover[current_bricks : current_bricks + remaining_bricks]
             else:
-                self.traj_builders[i] = range(current_bricks, current_bricks + bricks_per_worker)
+                self.traj_builders[i] = brick_to_cover[current_bricks : current_bricks + bricks_per_worker]
             current_bricks = current_bricks + bricks_per_worker
 
-    def worker_(self, worker_id, brick_poses, covered_traj, X_WBrickSource, q0):
+    def worker_(self, worker_id, brick_poses, covered_traj, X_WBrickSource, q0, robot_pose):
         for b_id, b_pose in brick_poses:
             # Set points
             b = b_pose
@@ -43,14 +44,17 @@ class HighPerformanceTrajectoryBuilder:
 
             # Generate trajectory options based on different bypass trajectories
             R = 0.4  # bypass radius
-            Rc = (0, 0)  # bypass center
+            if not robot_pose == None:
+                Rc = (robot_pose.translation()[0], robot_pose.translation()[1])  # bypass center
+            else:
+                Rc = (0, 0)
             P1 = (X_WBrickSource.translation()[0], X_WBrickSource.translation()[1])
             P2 = (X_WBrickTarget.translation()[0], X_WBrickTarget.translation()[1])
             bypass_P_pairs = TrajectoryBuilder.generate_bypass(R, Rc, P1, P2)
 
             # Generate trajectories
             for bypass_p in bypass_P_pairs:
-                trj_builder_for_brick = TrajectoryBuilder(self.system, X_WBrickSource)
+                trj_builder_for_brick = TrajectoryBuilder(X_WBrickSource)
                 # Grab
                 trj_builder_for_brick.gen_grab_brick_traj(b_id)
                 # Move to place
@@ -79,7 +83,7 @@ class HighPerformanceTrajectoryBuilder:
                     trj_builder_for_brick.gen_return_to_source_traj(b_id)
 
                 # Solve IK for the trajectories
-                res, q = trj_builder_for_brick.solve_IK(q0)
+                res, q = trj_builder_for_brick.solve_IK(q0, robot_pose)
                 if res == False:
                     continue
                 else:
@@ -98,7 +102,7 @@ class HighPerformanceTrajectoryBuilder:
             for b_id in bricks:
                 brick_poses.append((b_id, self.planer.get_brick_poses()[b_id]))
 
-            t = Process(target=self.worker_, args=(trj_b_id, brick_poses, covered_traj, self.X_WBrickSource, self.q0))
+            t = Process(target=self.worker_, args=(trj_b_id, brick_poses, covered_traj, self.X_WBrickSource, self.q0, self.robot_pose))
             t.start()
             threads[t] = covered_traj
 
@@ -111,7 +115,7 @@ class HighPerformanceTrajectoryBuilder:
 
         total_bricks_failed = []
         total_bricks_covered = []
-        for b in range(self.num_of_bricks):
+        for b in self.brick_to_cover:
             if b in total_trajectories.keys():
                 initial_traj.get_trajectories().merge_in(total_trajectories[b])
                 total_bricks_covered.append(b)

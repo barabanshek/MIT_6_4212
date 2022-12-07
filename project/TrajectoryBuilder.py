@@ -18,10 +18,9 @@ from Visualizer import *
 #
 class TrajectoryBuilder:
     # Init trajectory builder with the brick source at X_WBrickSource
-    def __init__(self, system, X_WBrickSource):
+    def __init__(self, X_WBrickSource):
         #
         self.X_WBrickSource = X_WBrickSource
-        self.system = system
 
         # define some constant reference poses
         self.X_BrickSourcePreG = RigidTransform(RotationMatrix.MakeXRotation(-np.pi/2),
@@ -151,9 +150,9 @@ class TrajectoryBuilder:
 
         return bypass_P_pairs
 
-    def gen_initial_traj(self):
+    def gen_initial_traj(self, X_WG):
         self.trajectory.append_point(0,
-                                     self.system.get_X_WG(),
+                                     X_WG,
                                      self.finger_opened,
                                      0,
                                      'initial',
@@ -278,8 +277,8 @@ class TrajectoryBuilder:
         return self.trajectory
 
     # Solve IK offline using IKOptimizationController and store the result in the trajecotry[6]
-    def solve_IK(self, q_nominal, debug=False):
-        ik_controller = IKOptimizationController()
+    def solve_IK(self, q_nominal, robot_pose = None, debug=False):
+        ik_controller = IKOptimizationController(robot_pose)
 
         # Solve for all other positions
         q_prev = q_nominal

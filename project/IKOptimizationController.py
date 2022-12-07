@@ -15,12 +15,12 @@ from pydrake.all import (AddMultibodyPlantSceneGraph, AngleAxis, BasicVector,
 # IK-based controller class
 #
 class IKOptimizationController():
-    def __init__(self):
-        self.plant, _ = self.CreateIiwaControllerPlant()
+    def __init__(self, robot_pose=None):
+        self.plant, _ = self.CreateIiwaControllerPlant(robot_pose)
         self.world_frame = self.plant.world_frame()
         self.gripper_frame = self.plant.GetFrameByName("body")
 
-    def CreateIiwaControllerPlant(self):
+    def CreateIiwaControllerPlant(self, robot_pose=None):
         robot_sdf_path = FindResourceOrThrow(
             "drake/manipulation/models/iiwa_description/iiwa7/iiwa7_no_collision.sdf")
         gripper_sdf_path = FindResourceOrThrow(
@@ -30,9 +30,16 @@ class IKOptimizationController():
         parser = Parser(plant=plant_robot)
         parser.AddModelFromFile(robot_sdf_path)
         parser.AddModelFromFile(gripper_sdf_path)
-        plant_robot.WeldFrames(
-            frame_on_parent_F=plant_robot.world_frame(),
-            frame_on_child_M=plant_robot.GetFrameByName("iiwa_link_0"))
+        if not robot_pose == None:
+            plant_robot.WeldFrames(
+                frame_on_parent_F=plant_robot.world_frame(),
+                frame_on_child_M=plant_robot.GetFrameByName("iiwa_link_0"),
+                X_FM=robot_pose
+            )
+        else:
+            plant_robot.WeldFrames(
+                frame_on_parent_F=plant_robot.world_frame(),
+                frame_on_child_M=plant_robot.GetFrameByName("iiwa_link_0"))
         plant_robot.WeldFrames(
             frame_on_parent_F=plant_robot.GetFrameByName("iiwa_link_7"),
             frame_on_child_M=plant_robot.GetFrameByName("body"),

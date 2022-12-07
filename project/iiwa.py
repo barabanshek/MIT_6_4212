@@ -7,7 +7,7 @@ from manipulation.meshcat_utils import AddMeshcatTriad
 from manipulation.scenarios import MakeManipulationStation
 from pydrake.all import (AddMultibodyPlantSceneGraph, AngleAxis, BasicVector,
                          ConstantVectorSource, DiagramBuilder,
-                         FindResourceOrThrow, Integrator, JacobianWrtVariable,
+                         FindResourceOrThrow, JacobianWrtVariable,
                          LeafSystem, MeshcatVisualizer,
                          MeshcatVisualizerParams, MultibodyPlant,
                          MultibodyPositionToGeometryPose, Parser,
@@ -19,11 +19,11 @@ from pydrake.all import (AddMultibodyPlantSceneGraph, AngleAxis, BasicVector,
 #
 # Model definition
 #
-gModelDerectives = """
+model_directives = """
 directives:
-- add_directives:
-    file: package://manipulation/iiwa_and_wsg.dmd.yaml
+"""
 
+gModelScene = """
 - add_frame:
     name: ground_origin
     X_PF:
@@ -38,7 +38,36 @@ directives:
 - add_weld:
     parent: ground_origin
     child: ground::ground_base
+"""
 
+# Robot template
+gRobotTemplate = """
+- add_model:
+    name: iiwa$
+    file: package://drake/manipulation/models/iiwa_description/iiwa7/iiwa7_no_collision.sdf
+    default_joint_positions:
+        iiwa_joint_1: [-1.57]
+        iiwa_joint_2: [0.1]
+        iiwa_joint_3: [0]
+        iiwa_joint_4: [-1.2]
+        iiwa_joint_5: [0]
+        iiwa_joint_6: [ 1.6]
+        iiwa_joint_7: [0]
+- add_weld:
+    parent: world
+    child: iiwa$::iiwa_link_0
+    X_PC:
+        translation: [X_PC$, Y_PC$, Z_PC$]
+        rotation: !Rpy { deg: [0, 0, 0]}
+- add_model:
+    name: wsg$
+    file: package://drake/manipulation/models/wsg_50_description/sdf/schunk_wsg_50_with_tip.sdf
+- add_weld:
+    parent: iiwa$::iiwa_link_7
+    child: wsg$::body
+    X_PC:
+        translation: [0, 0, 0.09]
+        rotation: !Rpy { deg: [90, 0, 90]}
 """
 
 # Brick template
@@ -53,14 +82,26 @@ gBrickString = """
 # iiwa robot class
 #
 class IIWA_Ilyich():
-    def __init__(self, meshcat, num_of_bricks, brick_geom, traj_in=None):
+    def __init__(self, meshcat, num_of_bricks, brick_geom, robot_s, traj_s = None):
         self.brick_geom = brick_geom
 
         global gModelDerectives
         global gBrickString
 
+        # set up robots
+        self.robot_idxs_string = []
+        model_directive = model_directives
+        for i, robot in enumerate(robot_s):
+            self.robot_idxs_string.append(str(i))
+            robot_new = gRobotTemplate.replace("X_PC$", str(robot[0]))
+            robot_new = robot_new.replace("Y_PC$", str(robot[1]))
+            robot_new = robot_new.replace("Z_PC$", str(robot[2]))
+            robot_new = robot_new.replace("iiwa$", 'iiwa' + str(i))
+            robot_new = robot_new.replace("wsg$", 'wsg' + str(i))
+            model_directive = model_directive + robot_new
+
         # set up scene
-        model_directive = gModelDerectives
+        model_directive = model_directive + gModelScene
         for i in range(0, num_of_bricks):
             brick_string_new = gBrickString.replace("brick$", "brick_" + str(i))
             model_directive = model_directive + brick_string_new
@@ -75,31 +116,19 @@ class IIWA_Ilyich():
         self.plant = self.station.GetSubsystemByName("plant")
 
         # optionally add trajectory source
-        if traj_in is not None:
-            # traj and PseudoInverseController
-            traj = traj_in[0]
-            #traj_V_G = traj.MakeDerivative()
-            V_G_source = builder.AddSystem(TrajectorySource(traj))
-            #self.controller = builder.AddSystem(
-            #    PseudoInverseController(self.plant))
-            #builder.Connect(V_G_source.get_output_port(),
-            #                self.controller.GetInputPort("V_G"))
+        if traj_s is not None:
+            for i, traj_in in enumerate(traj_s):
+                # traj for robot
+                traj = traj_in[0]
+                V_G_source = builder.AddSystem(TrajectorySource(traj))
+                builder.Connect(V_G_source.get_output_port(),
+                                self.station.GetInputPort("iiwa" + str(i) + "_position"))
 
-            # integrator and controller
-            #self.integrator = builder.AddSystem(Integrator(7))
-            #builder.Connect(self.controller.get_output_port(),
-            #                self.integrator.get_input_port())
-            builder.Connect(V_G_source.get_output_port(),
-                            self.station.GetInputPort("iiwa_position"))
-            #builder.Connect(
-            #    self.station.GetOutputPort("iiwa_position_measured"),
-            #    self.controller.GetInputPort("iiwa_position"))
-
-            # and trajectory source for the grip fingers as well
-            finger_traj = traj_in[1]
-            wsg_source = builder.AddSystem(TrajectorySource(finger_traj))
-            wsg_source.set_name("wsg_command")
-            builder.Connect(wsg_source.get_output_port(), self.station.GetInputPort("wsg_position"))
+                # and trajectory source for the grip fingers as well
+                finger_traj = traj_in[1]
+                wsg_source = builder.AddSystem(TrajectorySource(finger_traj))
+                wsg_source.set_name("wsg" + str(i) + "_command")
+                builder.Connect(wsg_source.get_output_port(), self.station.GetInputPort("wsg" + str(i) + "_position"))
 
         # visualization
         params = MeshcatVisualizerParams()
@@ -108,9 +137,11 @@ class IIWA_Ilyich():
             builder, self.station.GetOutputPort("query_object"), self.meshcat, params)
 
         # build and add diagram
-        self.diagram = builder.Build()    
-        self.gripper_frame = self.plant.GetFrameByName('body')
+        self.diagram = builder.Build()
         self.world_frame = self.plant.world_frame()
+        self.gripper_frame = []
+        for i_s in self.robot_idxs_string:
+            self.gripper_frame.append(self.plant.GetFrameByName('body', model_instance=self.plant.GetModelInstanceByName("wsg" + i_s)))
 
         # resolve context
         context = self.CreateDefaultContext()
@@ -132,40 +163,32 @@ class IIWA_Ilyich():
         # provide initial states
         q0 = np.array([ 1.40666193e-05,  1.56461165e-01, -3.82761069e-05,
                        -1.32296976e+00, -6.29097287e-06,  1.61181157e+00, -2.66900985e-05])
-        iiwa = self.plant.GetModelInstanceByName("iiwa")
-        self.plant.SetPositions(plant_context, iiwa, q0)
-        self.plant.SetVelocities(plant_context, iiwa, np.zeros(7))
-        wsg = self.plant.GetModelInstanceByName("wsg")
-        self.plant.SetPositions(plant_context, wsg, [-0.05, 0.05])
-        self.plant.SetVelocities(plant_context, wsg, [0, 0])        
-
-        if hasattr(self, 'integrator'):
-            self.integrator.set_integral_value(
-                self.integrator.GetMyMutableContextFromRoot(context), q0)
+        for i_s in self.robot_idxs_string:
+            iiwa = self.plant.GetModelInstanceByName("iiwa" + i_s)
+            self.plant.SetPositions(plant_context, iiwa, q0)
+            self.plant.SetVelocities(plant_context, iiwa, np.zeros(7))
+            wsg = self.plant.GetModelInstanceByName("wsg" + i_s)
+            self.plant.SetPositions(plant_context, wsg, [-0.05, 0.05])
+            self.plant.SetVelocities(plant_context, wsg, [0, 0])        
 
         return context
 
-    def reset_integrator(self, context, q0):
-        if hasattr(self, 'integrator'):
-            self.integrator.set_integral_value(
-                self.integrator.GetMyMutableContextFromRoot(context), q0)
-            
-    def get_q0(self, context):
-        station_context = self.station.GetMyContextFromRoot(context)
-        return self.station.GetOutputPort("iiwa_position_measured").Eval(station_context)
-    
     # Helper to get current grip position
     def get_X_WG(self, context=None):
 
         if not context:
             context = self.CreateDefaultContext()
         plant_context = self.plant.GetMyMutableContextFromRoot(context)
-        X_WG = self.plant.CalcRelativeTransform(
-                    plant_context,
-                    frame_A=self.world_frame,
-                    frame_B=self.gripper_frame)
-        return X_WG
-    
+
+        ret = []
+        for gf in self.gripper_frame:
+            X_WG = self.plant.CalcRelativeTransform(
+                        plant_context,
+                        frame_A=self.world_frame,
+                        frame_B=gf)
+            ret.append(X_WG)
+        return ret
+
     # Lock bricks
     def lock_brick(self, context, brick_num):
         plant_context = self.plant.GetMyMutableContextFromRoot(context)
