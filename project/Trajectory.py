@@ -51,6 +51,15 @@ class Trajectory():
         for trj in traj_to_merge.get_traj():
             self.traj.append(trj)
 
+    # Compute the total length of the trajectory
+    def get_length(self):
+        l = 0
+        for i in range(len(self.traj) - 1):
+            p = self.traj[i][1]
+            p1 = self.traj[i+1][1]
+            l = l + np.linalg.norm(p.translation() - p1.translation())
+        return l
+
     # Shrink trajectories by scaling all timestamps for each point
     def slow_down(self, k):
         for trj in self.traj:

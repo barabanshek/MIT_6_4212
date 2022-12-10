@@ -53,6 +53,7 @@ class HighPerformanceTrajectoryBuilder:
             bypass_P_pairs = TrajectoryBuilder.generate_bypass(R, Rc, P1, P2)
 
             # Generate trajectories
+            covered_traj_collection = []
             for bypass_p in bypass_P_pairs:
                 trj_builder_for_brick = TrajectoryBuilder(X_WBrickSource)
                 # Grab
@@ -87,8 +88,20 @@ class HighPerformanceTrajectoryBuilder:
                 if res == False:
                     continue
                 else:
-                    covered_traj.append((b_id, trj_builder_for_brick.get_trajectories()))
-                    break
+                    covered_traj_collection.append(trj_builder_for_brick.get_trajectories())
+
+            # If there are multiple feasible trajectories, select the shortest
+            if (len(covered_traj_collection) == 1):
+                covered_traj.append((b_id, covered_traj_collection[0]))
+            elif (len(covered_traj_collection) > 1):
+                shortest = 999999
+                shortest_traj = None
+                for t in covered_traj_collection:
+                    length = t.get_length()
+                    if length < shortest:
+                        shortest = length
+                        shortest_traj = t
+                covered_traj.append((b_id, shortest_traj))
 
     def solve(self, initial_traj):
         # {thread -> covered_traj}
